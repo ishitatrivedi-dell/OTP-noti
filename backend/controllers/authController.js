@@ -2,6 +2,7 @@ const User = require('../models/User');
 const OTP = require('../models/OTP');
 const Notification = require('../models/Notification');
 const { generateSixDigitOtp, otpExpiryDate } = require('../services/otp');
+const { sendOtpEmail } = require('../services/emailService');
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -29,11 +30,20 @@ async function sendOtp(req, res) {
     await OTP.create({ email, otp, expiresAt });
     await logger.info('DB_OP', 'Stored OTP in DB', { meta: { email, collection: 'OTP', expiresAt } });
 
-    // Simulate email via console
-    console.log(`[SIMULATED EMAIL] OTP for ${email}: ${otp} (expires in 5 minutes)`);
+    // Send actual email
+    await logger.info('EMAIL_SEND', 'Sending OTP email', { meta: { email } });
+    const emailResult = await sendOtpEmail(email, otp);
+    await logger.info('EMAIL_SENT', 'OTP email sent successfully', { 
+      meta: { email, testMode: emailResult.testMode, previewUrl: emailResult.previewUrl } 
+    });
+
     if (io) io.emit('user-action', { action: 'OTP_SENT', email, timestamp: new Date().toISOString() });
 
-    return res.json({ message: 'OTP sent (simulated). Check console.' });
+    return res.json({ 
+      message: emailResult.message,
+      testMode: emailResult.testMode,
+      previewUrl: emailResult.previewUrl
+    });
   } catch (err) {
     console.error(err);
     await req.app.get('logger')?.info('ERROR', 'sendOtp failed', { meta: { error: String(err) } });

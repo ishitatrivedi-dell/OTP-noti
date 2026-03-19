@@ -81,8 +81,12 @@ export default function App() {
     setUserActions((prev) => [{ action: 'Clicked Send OTP', email, _ts: Date.now() }, ...prev])
     try {
       localStorage.setItem('tbv_email', email)
-      await sendOtp(email)
-      setStatus('OTP sent. Check backend console (simulated email).')
+      const data = await sendOtp(email)
+      if (data.testMode && data.previewUrl) {
+        setStatus(`OTP sent (test mode). Check console for preview URL: ${data.previewUrl}`)
+      } else {
+        setStatus('OTP sent successfully to your email!')
+      }
     } catch (e) {
       setStatus('')
       setError(e.message)
