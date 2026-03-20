@@ -8,6 +8,7 @@ const apiRoutes = require('./routes');
 const { makeLogger } = require('./services/logger');
 const { initSocket } = require('./socket/initSocket');
 const { initCron } = require('./cron/initCron');
+const { checkAuthentication } = require('./middleware/checkAuth');
 
 // Basic app setup
 const app = express();
@@ -23,6 +24,7 @@ const io = new Server(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(checkAuthentication); // Check authentication on all requests
 
 // Simple environment config (you can move to .env later)
 const PORT = process.env.PORT || 5001;

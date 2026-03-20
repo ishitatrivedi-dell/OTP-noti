@@ -3,6 +3,7 @@ const OTP = require('../models/OTP');
 const Notification = require('../models/Notification');
 const { generateSixDigitOtp, otpExpiryDate } = require('../services/otp');
 const { sendOtpEmail } = require('../services/emailService');
+const { generateUserToken } = require('../services/jwtService');
 
 function normalizeEmail(email) {
   return String(email || '').trim().toLowerCase();
@@ -93,8 +94,13 @@ async function verifyOtp(req, res) {
 
     await logger.info('OTP_VERIFY', 'OTP verified', { userId: user._id, meta: { email } });
 
+    // Generate JWT token
+    const token = generateUserToken(user);
+    await logger.info('JWT_GENERATED', 'JWT token created', { userId: user._id, meta: { email } });
+
     return res.json({
       message: 'OTP verified',
+      token,
       user: { id: String(user._id), email: user.email, isVerified: user.isVerified },
     });
   } catch (err) {

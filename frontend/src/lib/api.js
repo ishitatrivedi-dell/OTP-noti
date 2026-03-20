@@ -1,9 +1,35 @@
 import { API_URL } from './config'
 
-async function request(path, { method = 'GET', body } = {}) {
+// Token management
+function getToken() {
+  return localStorage.getItem('tbv_token')
+}
+
+function setToken(token) {
+  localStorage.setItem('tbv_token', token)
+}
+
+function removeToken() {
+  localStorage.removeItem('tbv_token')
+}
+
+async function request(path, { method = 'GET', body, requireAuth = false } = {}) {
+  const headers = {}
+  if (body) {
+    headers['Content-Type'] = 'application/json'
+  }
+  
+  if (requireAuth) {
+    const token = getToken()
+    if (!token) {
+      throw new Error('Authentication required')
+    }
+    headers['Authorization'] = `Bearer ${token}`
+  }
+
   const res = await fetch(`${API_URL}${path}`, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   })
   const data = await res.json().catch(() => ({}))
@@ -22,6 +48,14 @@ export function verifyOtp(email, otp) {
   return request('/api/auth/verify-otp', { method: 'POST', body: { email, otp } })
 }
 
+export function getCurrentUser() {
+  return request('/api/users/me', { requireAuth: true })
+}
+
+export function updateProfile(data) {
+  return request('/api/users/profile', { method: 'PUT', body: data, requireAuth: true })
+}
+
 export function fetchLogs({ limit = 200, action } = {}) {
   const qs = new URLSearchParams()
   if (limit) qs.set('limit', String(limit))
@@ -37,4 +71,43 @@ export function fetchNotifications({ userId, limit = 20 }) {
   const qs = new URLSearchParams({ userId, limit: String(limit) })
   return request(`/api/notifications?${qs.toString()}`)
 }
+
+export function exportLogs({ format = 'json', limit = 1000, action } = {}) {
+  const qs = new URLSearchParams({ format: String(format), limit: String(limit) })
+  if (action) qs.set('action', action)
+  
+  const token = getToken()
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  return fetch(`${API_URL}/api/export/logs?${qs.toString()}`, {
+    headers
+  }).then(res => {
+    if (!res.ok) {
+      throw new Error(`Export failed: ${res.status}`)
+    }
+    return res
+  })
+}
+
+export function getAuthStatus() {
+  const token = getToken()
+  const headers = {}
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`
+  }
+  
+  return fetch(`${API_URL}/api/auth-status/status`, {
+    headers
+  }).then(res => {
+    if (!res.ok) {
+      throw new Error(`Auth check failed: ${res.status}`)
+    }
+    return res.json()
+  })
+}
+
+export { getToken, setToken, removeToken }
 
