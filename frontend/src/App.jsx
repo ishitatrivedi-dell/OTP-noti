@@ -77,6 +77,15 @@ function AppContent() {
     const validateAuth = async () => {
       setIsCheckingAuth(true)
 
+      // Clear invalid data if user exists but no token
+      if (user && !token) {
+        setUser(null)
+        localStorage.removeItem('tbv_user')
+        localStorage.removeItem('tbv_token')
+        setIsCheckingAuth(false)
+        return
+      }
+
       if (token && !user) {
         try {
           const data = await getCurrentUser()
@@ -136,6 +145,8 @@ function AppContent() {
 
   // ✅ Initial data
   useEffect(() => {
+    if (!user || !token) return // Only fetch data when user and token are present
+    
     ;(async () => {
       try {
         const [{ logs: initialLogs }, daily] = await Promise.all([
@@ -149,7 +160,7 @@ function AppContent() {
         setError(e.message)
       }
     })()
-  }, [])
+  }, [user, token])
 
   // ✅ Notifications
   useEffect(() => {
@@ -238,25 +249,44 @@ function AppContent() {
           <div>Checking Authentication...</div>
         ) : !user ? (
           <Panel title="Login">
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              className={`w-full ${inputThemes[theme]}`}
-            />
+            <div className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm opacity-60">Email</label>
+                <input
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="you@example.com"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm outline-none ${inputThemes[theme]}`}
+                />
+              </div>
 
-            <button onClick={onSendOtp}>Send OTP</button>
+              <button 
+                onClick={onSendOtp}
+                className="w-full rounded-lg bg-blue-500 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-400"
+              >
+                Send OTP
+              </button>
 
-            <input
-              value={otp}
-              onChange={(e) => setOtp(e.target.value)}
-              placeholder="OTP"
-            />
+              <div>
+                <label className="mb-1 block text-sm opacity-60">OTP</label>
+                <input
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  placeholder="6-digit OTP"
+                  className={`w-full rounded-lg border px-3 py-2 text-sm outline-none ${inputThemes[theme]}`}
+                />
+              </div>
 
-            <button onClick={onVerifyOtp}>Verify OTP</button>
+              <button 
+                onClick={onVerifyOtp}
+                className="w-full rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-400"
+              >
+                Verify OTP
+              </button>
 
-            {status && <div>{status}</div>}
-            {error && <div>{error}</div>}
+              {status && <div className="text-sm text-white/70">{status}</div>}
+              {error && <div className="text-sm text-red-300">{error}</div>}
+            </div>
           </Panel>
         ) : (
           <div>
