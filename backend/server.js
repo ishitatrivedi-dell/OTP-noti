@@ -24,7 +24,6 @@ const io = new Server(server, {
 // Middleware
 app.use(cors());
 app.use(express.json());
-app.use(checkAuthentication); // Check authentication on all requests
 
 // Simple environment config (you can move to .env later)
 const PORT = process.env.PORT || 5001;
