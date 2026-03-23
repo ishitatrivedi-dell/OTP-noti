@@ -1,22 +1,24 @@
 require('dotenv').config();
+
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { Server } = require('socket.io');
+
 const apiRoutes = require('./routes');
 const { makeLogger } = require('./services/logger');
 const { initSocket } = require('./socket/initSocket');
 const { initCron } = require('./cron/initCron');
-const { checkAuthentication } = require('./middleware/checkAuth');
 
 // Basic app setup
 const app = express();
 const server = http.createServer(app);
 
+// Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: 'http://localhost:5173',
+    origin: '*', // allow all for now (you can restrict later)
     methods: ['GET', 'POST'],
   },
 });
@@ -25,60 +27,69 @@ const io = new Server(server, {
 app.use(cors());
 app.use(express.json());
 
-// Simple environment config (you can move to .env later)
-const PORT = process.env.PORT || 5001;
-const MONGO_URI = process.env.MONGO_URI || 'mongodb+srv://ishitatrivedi:061106@cluster0.eynxp9t.mongodb.net/transparent-backend-visualizer?retryWrites=true&w=majority';
+// Environment config
+const PORT = process.env.PORT || 5000;
+const MONGO_URI = process.env.MONGO_URI;
 
-// Socket.io basic connection
+// Debug logs (helps in Render)
+console.log("🔥 Server file started");
+console.log("MONGO_URI:", MONGO_URI ? "FOUND" : "MISSING");
+
+// Socket connection
 io.on('connection', (socket) => {
   console.log('Client connected', socket.id);
+
   socket.on('disconnect', () => {
     console.log('Client disconnected', socket.id);
   });
 });
 
-// Attach io to app so it can be used in routes/services
+// Attach io + logger
 app.set('io', io);
 app.set('logger', makeLogger({ io }));
 
-// Basic request logging (core visualization)
+// Request logging
 app.use(async (req, res, next) => {
   const logger = req.app.get('logger');
   const startedAt = Date.now();
+
   res.on('finish', async () => {
-    await logger.info('API', `${req.method} ${req.originalUrl} -> ${res.statusCode}`, {
-      meta: { ms: Date.now() - startedAt },
-    });
+    await logger.info(
+      'API',
+      `${req.method} ${req.originalUrl} -> ${res.statusCode}`,
+      {
+        meta: { ms: Date.now() - startedAt },
+      }
+    );
   });
+
   next();
 });
 
-// Health check
+// Health check route
 app.get('/', (req, res) => {
-  res.json({ message: 'Backend is running' });
+  res.json({ message: 'Backend is running ✅' });
 });
 
+// Routes
 app.use('/api', apiRoutes);
 
-// Mongo connection and server start
+// MongoDB connection + server start
 mongoose
   .connect(MONGO_URI)
   .then(() => {
-    console.log('MongoDB connected');
+    console.log('✅ MongoDB connected');
 
-    // Init socket + cron after DB connects
+    // Initialize socket + cron jobs
     initSocket(io, { logger: app.get('logger') });
     initCron({ logger: app.get('logger') });
 
+    // Start server (IMPORTANT: only this, no app.listen)
     server.listen(PORT, () => {
-      console.log(`Server listening on port ${PORT}`);
+      console.log(`🚀 Server running on port ${PORT}`);
     });
   })
   .catch((err) => {
-    console.error('MongoDB connection error', err);
+    console.error('❌ MongoDB connection error:', err.message);
+    process.exit(1);
   });
-
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
