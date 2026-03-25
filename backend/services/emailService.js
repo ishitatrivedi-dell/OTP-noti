@@ -1,19 +1,5 @@
 const nodemailer = require('nodemailer');
 
-// Create a transporter using Gmail (you can change this to any email service)
-// For Gmail, you'll need to:
-// 1. Enable 2-factor authentication
-// 2. Generate an App Password from Google Account settings
-// 3. Use the App Password instead of your regular password
-
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER || 'your-email@gmail.com', // Replace with your email
-    pass: process.env.EMAIL_PASS || 'your-app-password',     // Replace with your app password
-  },
-});
-
 // For development, you can use Ethereal test account
 let isTestMode = false;
 
@@ -47,7 +33,15 @@ async function initTransporter() {
     isTestMode = true;
     return await createTestAccount();
   }
-  return transporter;
+  
+  // Create Gmail transporter with environment credentials
+  return nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASS,
+    },
+  });
 }
 
 let emailTransporter = null;

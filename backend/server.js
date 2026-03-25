@@ -29,7 +29,10 @@ app.use(express.json());
 
 // Environment config
 const PORT = process.env.PORT || 5000;
-const MONGO_URI = process.env.MONGO_URI;
+const MONGO_URI = process.env.MONGO_URI || 'MONGO_URI=mongodb+srv://ishitatrivedi:061106@cluster0.eynxp9t.mongodb.net/transparent-backend-visualizer?retryWrites=true&w=majority';
+const LOCAL_MONGO_URI = 'mongodb://127.0.0.1:27017/transparent-backend-visualizer';
+
+console.log("MONGO_URI:", MONGO_URI);
 
 // Debug logs (helps in Render)
 console.log("🔥 Server file started");
@@ -75,21 +78,47 @@ app.get('/', (req, res) => {
 app.use('/api', apiRoutes);
 
 // MongoDB connection + server start
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    console.log('✅ MongoDB connected');
+async function connectToMongo() {
+  try {
+    // Try primary MongoDB URI first
+    await mongoose.connect(MONGO_URI);
+    console.log('✅ Connected to primary MongoDB');
+    return true;
+  } catch (primaryError) {
+    console.log('❌ Primary MongoDB failed:', primaryError.message);
+    
+    try {
+      // Fallback to local MongoDB
+      await mongoose.connect(LOCAL_MONGO_URI);
+      console.log('✅ Connected to local MongoDB (fallback)');
+      return true;
+    } catch (localError) {
+      console.log('❌ Local MongoDB also failed:', localError.message);
+      return false;
+    }
+  }
+}
 
+connectToMongo().then((connected) => {
+  if (connected) {
     // Initialize socket + cron jobs
     initSocket(io, { logger: app.get('logger') });
     initCron({ logger: app.get('logger') });
 
-    // Start server (IMPORTANT: only this, no app.listen)
+    // Start server
     server.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
     });
-  })
-  .catch((err) => {
-    console.error('❌ MongoDB connection error:', err.message);
-    process.exit(1);
-  });
+  } else {
+    console.error('❌ Could not connect to any MongoDB instance');
+    console.log('🔄 Starting server without database (limited functionality)');
+    
+    // Start server anyway for basic functionality
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT} (no database)`);
+    });
+  }
+}).catch((err) => {
+  console.error('❌ Server startup error:', err.message);
+  process.exit(1);
+});
