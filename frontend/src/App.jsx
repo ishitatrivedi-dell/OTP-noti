@@ -26,7 +26,7 @@ function formatTs(ts) {
 function AppContent() {
   const { theme, toggleTheme, themeClasses, inputThemes } = useTheme()
 
-  const [email, setEmail] = useState(localStorage.getItem('tbv_email') || '')
+  const [email, setEmail] = useState('')
   const [otp, setOtp] = useState('')
   const [user, setUser] = useState(() => {
     const raw = localStorage.getItem('tbv_user')
@@ -181,7 +181,6 @@ function AppContent() {
     emitUserAction('Clicked Send OTP', { email })
 
     try {
-      localStorage.setItem('tbv_email', email)
       const data = await sendOtp(email)
 
       setStatus(
