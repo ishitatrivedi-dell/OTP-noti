@@ -46,7 +46,11 @@ async function sendOtp(req, res) {
       io.emit('user-action', { action: 'OTP_SENT', email, timestamp: new Date().toISOString() });
     }
 
-    return res.json({ message: emailResult.message });
+    return res.json({
+      message: emailResult.message,
+      testMode: emailResult.testMode,
+      ...(emailResult.previewUrl ? { previewUrl: emailResult.previewUrl } : {}),
+    });
 
   } catch (err) {
     console.error('❌ sendOtp error:', err.message);
@@ -60,6 +64,7 @@ async function sendOtp(req, res) {
  * Body: { email: string, otp: string }
  */
 async function verifyOtp(req, res) {
+  const io = req.app.get('io');
   const logger = req.app.get('logger');
 
   try {
@@ -98,11 +103,18 @@ async function verifyOtp(req, res) {
     logger && await logger.info('DB_OP', 'Deleted used OTPs', { userId: user._id, meta: { email } });
 
     // Welcome notification
-    await Notification.create({
+    const notification = await Notification.create({
       userId: String(user._id),
       message: 'OTP verified successfully. Welcome!',
       read: false,
       createdAt: new Date(),
+    });
+    io?.emit('notification-update', {
+      _id: String(notification._id),
+      userId: notification.userId,
+      message: notification.message,
+      read: notification.read,
+      createdAt: notification.createdAt,
     });
 
     logger && await logger.info('OTP_VERIFY', 'OTP verified successfully', { userId: user._id, meta: { email } });

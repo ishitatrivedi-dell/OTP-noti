@@ -1,41 +1,58 @@
 const nodemailer = require('nodemailer');
 
 /**
- * Creates a Gmail transporter using env credentials.
- * Returns null if credentials are missing.
+ * Uses an Ethereal account for preview-only email unless Gmail is explicitly enabled.
  */
-function createGmailTransporter() {
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASS;
+async function createTransporter() {
+  const mode = (process.env.EMAIL_MODE || 'test').trim().toLowerCase();
 
-  if (!user || !pass) {
-    console.error('❌ EMAIL_USER or EMAIL_PASS is not set in environment variables.');
-    return null;
+  if (mode === 'test') {
+    const account = await nodemailer.createTestAccount();
+    console.log('📧 Email test mode enabled; messages will not be delivered to real inboxes.');
+    return nodemailer.createTransport({
+      host: 'smtp.ethereal.email',
+      port: 587,
+      secure: false,
+      auth: { user: account.user, pass: account.pass },
+      connectionTimeout: 10000,
+      greetingTimeout: 10000,
+      socketTimeout: 15000,
+    });
   }
 
-  console.log('📧 Creating Gmail transporter for:', user);
+  if (mode !== 'gmail') {
+    throw new Error('EMAIL_MODE must be either "test" or "gmail".');
+  }
 
+  const user = process.env.EMAIL_USER;
+  const pass = process.env.EMAIL_PASS;
+  if (!user || !pass) {
+    throw new Error('EMAIL_MODE=gmail requires EMAIL_USER and EMAIL_PASS.');
+  }
+
+  console.log('📧 Creating Gmail transporter.');
   return nodemailer.createTransport({
     service: 'gmail',
-    auth: { user, pass },
+    auth: { user, pass: pass.replace(/\s/g, '') },
     connectionTimeout: 10000,
     greetingTimeout: 10000,
     socketTimeout: 15000,
   });
 }
 
-// Module-level transporter cache
-let emailTransporter = null;
+let transporterPromise = null;
 
 /**
- * Returns the cached transporter, or creates a new one.
- * Resets cache if transporter is null so it can retry.
+ * Returns the cached transporter, or creates and caches one.
  */
-function getTransporter() {
-  if (!emailTransporter) {
-    emailTransporter = createGmailTransporter();
+async function getTransporter() {
+  if (!transporterPromise) {
+    transporterPromise = createTransporter().catch((error) => {
+      transporterPromise = null;
+      throw error;
+    });
   }
-  return emailTransporter;
+  return transporterPromise;
 }
 
 /**
@@ -44,19 +61,14 @@ function getTransporter() {
  * @param {string} otp - 6-digit OTP string
  */
 async function sendOtpEmail(toEmail, otp) {
-  console.log(`📤 Sending OTP email to: ${toEmail}`);
+  console.log('📤 Sending OTP email.');
 
-  const transporter = getTransporter();
+  const transporter = await getTransporter();
 
-  if (!transporter) {
-    throw new Error(
-      'Email service is not configured. Set EMAIL_USER and EMAIL_PASS environment variables.'
-    );
-  }
-
-  const fromAddress =
-    process.env.EMAIL_FROM ||
-    `"Transparent Backend Visualizer" <${process.env.EMAIL_USER}>`;
+  const isGmailMode = process.env.EMAIL_MODE?.trim().toLowerCase() === 'gmail';
+  const fromAddress = isGmailMode
+    ? `"Transparent Backend Visualizer" <${process.env.EMAIL_USER}>`
+    : process.env.EMAIL_FROM || '"Transparent Backend Visualizer" <no-reply@example.com>';
 
   const mailOptions = {
     from: fromAddress,
@@ -93,24 +105,31 @@ async function sendOtpEmail(toEmail, otp) {
 
   try {
     const info = await transporter.sendMail(mailOptions);
-    console.log(`✅ OTP email sent to ${toEmail} — Message ID: ${info.messageId}`);
+    console.log(`✅ OTP email sent — Message ID: ${info.messageId}`);
+    const previewUrl = nodemailer.getTestMessageUrl(info);
+    if (previewUrl) {
+      console.log(`🔎 Preview test email: ${previewUrl}`);
+    }
     return {
       success: true,
-      message: 'OTP sent successfully to your email.',
+      message: previewUrl
+        ? 'Test email sent. Open the preview link to view it.'
+        : 'OTP sent successfully to your email.',
+      testMode: Boolean(previewUrl),
+      ...(previewUrl ? { previewUrl } : {}),
     };
   } catch (error) {
-    // Reset transporter cache so next request gets a fresh one
-    emailTransporter = null;
+    transporterPromise = null;
 
     console.error('❌ Failed to send email:', error.message);
 
-    if (error.code === 'EAUTH') {
+    if (error.code === 'EAUTH' && process.env.EMAIL_MODE?.trim().toLowerCase() === 'gmail') {
       throw new Error(
-        'Gmail authentication failed. Ensure EMAIL_USER and EMAIL_PASS are correct and the App Password has no spaces.'
+        'Gmail authentication failed. Ensure EMAIL_USER and EMAIL_PASS are correct and use a Gmail App Password.'
       );
     }
     if (error.code === 'ECONNECTION' || error.code === 'ENOTFOUND') {
-      throw new Error('Could not connect to Gmail SMTP. Check your network connection.');
+      throw new Error('Could not connect to the email service. Check your network connection.');
     }
     if (error.code === 'ETIMEDOUT') {
       throw new Error('Email sending timed out. Please try again.');
@@ -126,16 +145,12 @@ async function sendOtpEmail(toEmail, otp) {
 async function testEmailConnection() {
   try {
     console.log('🧪 Testing email connection...');
-    const transporter = getTransporter();
-    if (!transporter) {
-      return { success: false, error: 'No transporter — EMAIL_USER or EMAIL_PASS missing.' };
-    }
+    const transporter = await getTransporter();
     await transporter.verify();
     console.log('✅ Email connection test passed');
     return { success: true, message: 'Email connection successful' };
   } catch (error) {
-    // Reset so next call retries
-    emailTransporter = null;
+    transporterPromise = null;
     console.error('❌ Email connection test failed:', error.message);
     return { success: false, error: error.message };
   }

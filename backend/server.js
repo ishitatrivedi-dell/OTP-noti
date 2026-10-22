@@ -26,7 +26,7 @@ app.use(express.json());
 // ─── Config ───────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5001;
 const ATLAS_URI = process.env.MONGO_URI || '';
-const LOCAL_URI = 'mongodb://127.0.0.1:27017/transparent-backend-visualizer';
+const LOCAL_URI = process.env.LOCAL_MONGO_URI || '';
 
 console.log('🔥 Server starting...');
 console.log('📦 MONGO_URI:', ATLAS_URI ? 'FOUND' : 'MISSING');
@@ -48,9 +48,13 @@ app.use(async (req, res, next) => {
   const logger = req.app.get('logger');
   const startedAt = Date.now();
   res.on('finish', async () => {
-    await logger.info('API', `${req.method} ${req.originalUrl} → ${res.statusCode}`, {
-      meta: { ms: Date.now() - startedAt },
-    });
+    try {
+      await logger.info('API', `${req.method} ${req.originalUrl} → ${res.statusCode}`, {
+        meta: { ms: Date.now() - startedAt },
+      });
+    } catch (error) {
+      console.error(`❌ Failed to persist API request log: ${error.message}`);
+    }
   });
   next();
 });
@@ -62,18 +66,31 @@ app.use('/api', apiRoutes);
 
 // ─── Start ────────────────────────────────────────────────────────────────────
 async function startServer() {
-  // Try Atlas first, then local, then start without DB
-  try {
-    await mongoose.connect(ATLAS_URI);
-    console.log('✅ Connected to MongoDB Atlas');
-  } catch {
-    console.log('⚠️  Atlas connection failed, trying local MongoDB...');
+  const candidates = [
+    ...(ATLAS_URI ? [{ uri: ATLAS_URI, label: 'configured MongoDB' }] : []),
+    { uri: LOCAL_URI, label: 'local MongoDB' },
+  ].filter((candidate, index, all) =>
+    all.findIndex((item) => item.uri === candidate.uri) === index
+  );
+  const failures = [];
+
+  for (const candidate of candidates) {
     try {
-      await mongoose.connect(LOCAL_URI);
-      console.log('✅ Connected to local MongoDB');
-    } catch {
-      console.log('⚠️  No MongoDB available — starting without database');
+      await mongoose.connect(candidate.uri);
+      await mongoose.connection.db.collection('logs').findOne({}, { projection: { _id: 1 } });
+      console.log(`✅ Connected to ${candidate.label}`);
+      break;
+    } catch (error) {
+      failures.push(`${candidate.label}: ${error.message}`);
+      console.error(`⚠️  Could not use ${candidate.label}: ${error.message}`);
+      await mongoose.disconnect();
     }
+  }
+
+  if (mongoose.connection.readyState !== 1) {
+    throw new Error(
+      `MongoDB is required to run this application. Configure valid database access in MONGO_URI or LOCAL_MONGO_URI.\n${failures.join('\n')}`
+    );
   }
 
   initSocket(io, { logger: app.get('logger') });
@@ -93,4 +110,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((error) => {
+  console.error(`❌ Backend startup failed: ${error.message}`);
+  process.exit(1);
+});
