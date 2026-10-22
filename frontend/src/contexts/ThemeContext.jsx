@@ -33,28 +33,48 @@ export function ThemeProvider({ children }) {
   }
 
   const themeClasses = {
-    dark: 'bg-slate-950 text-slate-100',
-    light: 'bg-white text-slate-900'
+    dark: 'bg-black text-white font-sf',
+    light: 'bg-black text-white font-sf'
   }
 
   const panelThemes = {
     dark: {
-      blue: 'border-blue-500/40 bg-blue-500/5',
-      yellow: 'border-yellow-500/40 bg-yellow-500/5',
-      green: 'border-green-500/40 bg-green-500/5',
-      neutral: 'border-white/10 bg-white/5',
+      blue: 'bg-neutral-900 text-white border border-white/10',
+      yellow: 'bg-neutral-900 text-white border border-white/10',
+      green: 'bg-neutral-900 text-white border border-white/10',
+      neutral: 'bg-neutral-900 text-white border border-white/10',
     },
     light: {
-      blue: 'border-blue-500/60 bg-blue-50',
-      yellow: 'border-yellow-500/60 bg-yellow-50',
-      green: 'border-green-500/60 bg-green-50',
-      neutral: 'border-slate-200 bg-slate-50',
+      blue: 'bg-neutral-900 text-white border border-white/10',
+      yellow: 'bg-neutral-900 text-white border border-white/10',
+      green: 'bg-neutral-900 text-white border border-white/10',
+      neutral: 'bg-neutral-900 text-white border border-white/10',
     }
   }
 
   const inputThemes = {
-    dark: 'border-white/10 bg-white/5 text-white placeholder-white/50 focus:border-blue-400/60',
-    light: 'border-slate-300 bg-white text-slate-900 placeholder-slate-500 focus:border-blue-400'
+    dark: 'bg-neutral-900 text-white placeholder-white/40 focus:border-white/30 rounded-xl border border-white/10',
+    light: 'bg-neutral-900 text-white placeholder-white/40 focus:border-white/30 rounded-xl border border-white/10'
+  }
+
+  const buttonThemes = {
+    dark: 'bg-white text-black hover:bg-gray-200',
+    light: 'bg-black text-white hover:bg-gray-800'
+  }
+
+  const secondaryButtonThemes = {
+    dark: 'bg-neutral-800 text-white hover:bg-neutral-700',
+    light: 'bg-neutral-200 text-black hover:bg-neutral-300'
+  }
+
+  const borderClasses = {
+    dark: 'border-white/10',
+    light: 'border-black/10'
+  }
+
+  const cardThemes = {
+    dark: 'bg-[#111111] border-white/10',
+    light: 'bg-[#f9f9f9] border-black/10'
   }
 
   return (
@@ -63,7 +83,11 @@ export function ThemeProvider({ children }) {
       toggleTheme,
       themeClasses,
       panelThemes,
-      inputThemes
+      inputThemes,
+      buttonThemes,
+      secondaryButtonThemes,
+      borderClasses,
+      cardThemes
     }}>
       {children}
     </ThemeContext.Provider>
