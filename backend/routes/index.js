@@ -16,4 +16,3 @@ router.use('/export', exportRoutes);
 router.use('/auth-status', authStatusRoutes);
 
 module.exports = router;
-

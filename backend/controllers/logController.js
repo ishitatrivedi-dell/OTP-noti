@@ -30,13 +30,12 @@ async function dailyActivity(req, res) {
     { $sort: { '_id.y': 1, '_id.m': 1, '_id.d': 1 } },
   ]);
 
-  const activity = buckets.map((b) => ({
-    date: `${b._id.y}-${String(b._id.m).padStart(2, '0')}-${String(b._id.d).padStart(2, '0')}`,
-    count: b.count,
+  const activity = buckets.map((bucket) => ({
+    date: `${bucket._id.y}-${String(bucket._id.m).padStart(2, '0')}-${String(bucket._id.d).padStart(2, '0')}`,
+    count: bucket.count,
   }));
 
   res.json({ since, days, activity });
 }
 
 module.exports = { listLogs, dailyActivity };
-

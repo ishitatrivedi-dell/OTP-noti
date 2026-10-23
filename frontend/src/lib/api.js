@@ -67,6 +67,14 @@ export function fetchDailyActivity({ days = 7 } = {}) {
   return request(`/api/logs/daily-activity?days=${encodeURIComponent(String(days))}`)
 }
 
+export function fetchOverviewMetrics({ days = 7 } = {}) {
+  return request(`/api/metrics/overview?days=${encodeURIComponent(String(days))}`, { requireAuth: true })
+}
+
+export function fetchHealth() {
+  return request('/api/health')
+}
+
 export function fetchNotifications({ userId, limit = 20 }) {
   const qs = new URLSearchParams({ userId, limit: String(limit) })
   return request(`/api/notifications?${qs.toString()}`)
@@ -110,4 +118,3 @@ export function getAuthStatus() {
 }
 
 export { getToken, setToken, removeToken }
-

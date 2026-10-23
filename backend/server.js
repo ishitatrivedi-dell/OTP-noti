@@ -48,9 +48,18 @@ app.use(async (req, res, next) => {
   const logger = req.app.get('logger');
   const startedAt = Date.now();
   res.on('finish', async () => {
+    if (req.path === '/api/metrics/overview' || req.path === '/api/health') return;
+
     try {
-      await logger.info('API', `${req.method} ${req.originalUrl} → ${res.statusCode}`, {
-        meta: { ms: Date.now() - startedAt },
+      const endpoint = req.path;
+      const message = `${req.method} ${endpoint} → ${res.statusCode}`;
+      await logger.info('API', message, {
+        meta: {
+          method: req.method,
+          endpoint,
+          statusCode: res.statusCode,
+          ms: Date.now() - startedAt,
+        },
       });
     } catch (error) {
       console.error(`❌ Failed to persist API request log: ${error.message}`);
